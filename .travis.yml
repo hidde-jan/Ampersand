@@ -1,122 +1,31 @@
-# This file is based on the travis.yml file of stack. 
-# (https://github.com/commercialhaskell/stack/blob/master/.travis.yml)
-#
 dist: trusty
 sudo: required
-#addons:
-#  mariadb: '10.0'
-#  apt:
-#    packages:
-#    - mysql-server-5.6
-#    - mysql-client-core-5.6
-#    - mysql-client-5.6
-
-
 cache:
-    directories:
-        - $HOME/.ghc
-        - $HOME/.cabal
-        - $HOME/.stack
-
-
-# The different configurations we want to test. We have BUILD=cabal which uses
-# cabal-install, and BUILD=stack which uses Stack. More documentation on each
-# of those below.
-#
-# We set the compiler values here to tell Travis to use a different
-# cache file per set of arguments.
-#
-# If you need to have different apt packages for each combination in the
-# matrix, you can use a line such as:
-#     addons: {apt: {packages: [libfcgi-dev,libgmp-dev]}}
+  directories:
+  - "$HOME/.ghc"
+  - "$HOME/.cabal"
+  - "$HOME/.stack"
 matrix:
   include:
-  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
-  # variable, such as using --stack-yaml to point to a different file.
   - env: BUILD=stack ARGS=""
     compiler: ": #stack 8.0.1"
-    addons: {apt: {packages: [ ghc-8.0.1
-                             , mysql-server-5.6
-                             , mysql-client-core-5.6
-                             , mysql-client-5.6
-                             ] 
-                  ,sources: [hvr-ghc]}}
-  - env: BUILD=stack ARGS="" osx
-    compiler: ": #stack 8.0.1"
-    os: osx
-
-
-  # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
-  # https://github.com/hvr/multi-ghc-travis
-  - env: BUILD=cabal GHCVER=8.0.1 CABALVER=1.24
-    compiler: ": #GHC 8.0.1"
-    addons: {apt: {packages: [ cabal-install-1.24
-                             , ghc-8.0.1
-                             , mysql-server-5.6
-                             , mysql-client-core-5.6
-                             , mysql-client-5.6
-                             ] 
-                  ,sources: [hvr-ghc]}}
-  - env: BUILD=cabal GHCVER=8.0.1 CABALVER=1.24 osx
-    compiler: ": #GHC 8.0.1"
-    addons: {apt: {packages: [ cabal-install-1.24
-                             , ghc-8.0.1
-                             , mysql-server-5.6
-                             , mysql-client-core-5.6
-                             , mysql-client-5.6
-                             ] 
-                  ,sources: [hvr-ghc]}}
-    os: osx
-
-  # Build with the newest GHC and cabal-install. This is an accepted failure,
-  # see below.
-  - env: BUILD=cabal GHCVER=head  CABALVER=head
-    compiler: ": #GHC HEAD"
-    addons: {apt: {packages: [ cabal-install-head
-                             , ghc-head
-                             , mysql-server-5.6
-                             , mysql-client-core-5.6
-                             , mysql-client-5.6
-                             ] 
-                  ,sources: [hvr-ghc]}}
-  # Nightly builds are allowed to fail
-  - env: BUILD=stack ARGS="--resolver nightly"
-    compiler: ": #stack nightly"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-
-  allow_failures:
-  - env: BUILD=cabal GHCVER=8.0.1 CABALVER=1.24
-  - env: BUILD=stack ARGS="--resolver nightly"
-  - env: BUILD=cabal GHCVER=head  CABALVER=head
-
-  # OSX builds currently (sept 2016) do not work, because PHP isn't available
-  - env: BUILD=stack ARGS="" osx
-  - env: BUILD=cabal GHCVER=8.0.1 CABALVER=1.24 osx
-
-
+    addons:
+      apt:
+        packages:
+        - ghc-8.0.1
+        - mysql-server-5.6
+        - mysql-client-core-5.6
+        - mysql-client-5.6
+        sources:
+        - hvr-ghc
   fast_finish: true
-
-
-
-# Note: the distinction between `before_install` and `install` is not important.
-# - in before_install we install build tools
-# - in install we install (haskell) dependencies
 before_install:
-# Using compiler above sets CC to an invalid value, so unset it
 - unset CC
-
-# We want to always allow newer versions of packages when building on GHC HEAD
 - CABALARGS=""
 - if [ "x$GHCVER" = "xhead" ]; then CABALARGS=--allow-newer; fi
-
-# We need to ensure that there is enough memory. See:
-# http://stackoverflow.com/questions/13104630/exitfailure-9-when-trying-to-install-ghc-mod-using-cabal 
 - sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
 - sudo mkswap /swapfile
 - sudo swapon /swapfile
-
-# Download and unpack the stack executable
 - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.local/bin:$PATH
 - mkdir -p ~/.local/bin
 - |
@@ -126,34 +35,36 @@ before_install:
   else
     curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   fi
-
 install:
-- echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+- echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo
+  '?')]"
 - chmod +x ./travis_long
 - if [ -f configure.ac ]; then autoreconf -i; fi
 - PATH=$PATH:~/.cabal/bin
-- |
-  case "$BUILD" in
-    stack)
-      stack --no-terminal --install-ghc $ARGS test --only-dependencies
-      ;;
-    cabal)
-      cabal --version
-      travis_retry cabal update
-      cabal install --enable-tests 
-      ;;
-  esac
+- "case \"$BUILD\" in\n  stack)\n    stack --no-terminal --install-ghc $ARGS test
+  --only-dependencies\n    ;;\n  cabal)\n    cabal --version\n    travis_retry cabal
+  update\n    cabal install --enable-tests \n    ;;\nesac\n"
+- mkdir -p dist/bin
 
-# We need composer for the Ampersand Prototypes to be installed.
 before_script: composer install
 
 script:
 - |
   case "$BUILD" in
     stack)
-    ./travis_long stack --no-terminal $ARGS test
+    ./travis_long stack --no-terminal --local-bin-path=dist/bin --copy-bins --test $ARGS build
       ;;
     cabal)
     ./travis_long cabal test
       ;;
   esac
+
+deploy:
+  provider: releases
+  api_key:
+    secure: Lzpil1RjuIpOYrpfMQYdIbwmFoylGbvoZLUpEZebUrpWWl/st31J9LwR2WosdjgGBogOQPz9eybjtHPdzJ+mCwOxJUb1HHKhwWYt9H+Gh2n7k9md652SjTLQkEtjcb9XK9qnrhmG9AY/y6ZQNcTV+iFaB9PwznGT4KfFPeOLIRGAbROV9SLJuC+ps4Bq8k/rzeilDt/IYQhdZAzQnc8ejyZG6WJRWpM1RFIQoYCMUSZSSsmL9y50XPMtTXZae+BErGSRzUojz9IiXsPFKETsuhOCCMKGKEwg8XrUYnn/4Yy7xsb6JgjookNPAlD7ga+jVRiHcnX2ZmQa1wdjy+F0H36vzkHTJUKmndGrd948213Pk4h6zDMt5AmOcyRlLzjBZvIUuEn3vYSbbbiTyf1N2DzzuTGl6gUeTd129rpPMuBLM1byGXq5HQnTMxFCGq1Aj7G7ClJ7eHGKHVykk2pH8aFgMwYlUDxPt9lVABDTIRjphgPdSETphXdaJD0hT2GDwfZ1mQjlvy/zdQFkH4y21oxw4sv4AuEFLAhafZPTtrijiG5jainlHplpjGAf1R84gtQ67Ac5xdW4NsBv3LyQz27e+ebOf4gmOF238FZzoq9WfQnxS4gH01PbqT6L3MldgTH8W+I99hFJm0OvbaIJwpdBDBVUFRAqVubi4kxRqhk=
+  file: "dist/bin/ampersand"
+  on:
+    repo: hidde-jan/Ampersand
+    tags: true
+    condition: $BUILD = stack
