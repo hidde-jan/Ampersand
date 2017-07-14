@@ -52,7 +52,7 @@ script:
 - |
   case "$BUILD" in
     stack)
-    ./travis_long stack --no-terminal --local-bin-path=dist/bin --copy-bins --test $ARGS build
+    ./travis_long stack --no-terminal --local-bin-path=dist/bin --copy-bins $ARGS build
       ;;
     cabal)
     ./travis_long cabal test
